@@ -418,7 +418,7 @@ if 'df_norm' in locals():
                     return f'background-color: {color}; color: {text_color}; font-weight: bold;'
                     
                 st.dataframe(
-                    df_det.style.applymap(style_cell_by_result, subset=['판정']),
+                    df_det.style.map(style_cell_by_result, subset=['판정']),
                     use_container_width=True, 
                     hide_index=True
                 )
