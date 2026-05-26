@@ -172,11 +172,13 @@ def train_standard_model():
         y = df_train_set['Target']
         
         # 실제 데이터 규모(추출물 1개, 코코넛오일 4개)가 매우 제한적이므로
-        # 과적합 방지를 위해 depth=2, iterations=50으로 강한 학습 규제를 적용합니다.
+        # 극단적인 클래스 불균형(1:4)을 해결하기 위해 auto_class_weights='Balanced' 가중치를 주며,
+        # 학습 최적화를 위해 iterations를 80, learning_rate를 0.08로 정밀 튜닝합니다.
         model = CatBoostClassifier(
-            iterations=50,
-            learning_rate=0.05,
+            iterations=80,
+            learning_rate=0.08,
             depth=2,
+            auto_class_weights='Balanced',
             verbose=0,
             random_seed=42
         )
