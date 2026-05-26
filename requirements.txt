@@ -1,0 +1,6 @@
+streamlit
+pandas
+openpyxl
+catboost
+shap
+matplotlib
