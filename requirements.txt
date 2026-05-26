@@ -4,3 +4,4 @@ openpyxl
 catboost
 shap
 matplotlib
+seaborn
