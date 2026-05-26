@@ -104,16 +104,17 @@ st.markdown("""
 # 2. 분석용 피처(지방산 10종) 정의
 # -----------------------------------------------------------------------------
 FEATURE_COLS = [
-    'Methyl caproate',   # C6:0
-    'Methyl caprylate',  # C8:0
-    'Methyl caprate',    # C10:0
-    'Methyl laurate',    # C12:0
-    'Methyl myristate',  # C14:0
-    'Methyl palmitate',  # C16:0
-    'Methyl stearate',   # C18:0
-    'Methyl oleate',     # C18:1
-    'Methyl linoleate',  # C18:2
-    'Methyl linolenate'  # C18:3
+    'Methyl caproate',      # C6:0
+    'Methyl caprylate',     # C8:0
+    'Methyl caprate',       # C10:0
+    'Methyl laurate',       # C12:0
+    'Methyl myristate',     # C14:0
+    'Methyl palmitate',     # C16:0
+    'Methyl palmitoleate',  # C16:1 (누락되었던 팔미톨레산 메틸 에스터 추가!)
+    'Methyl stearate',      # C18:0
+    'Methyl oleate',        # C18:1
+    'Methyl linoleate',     # C18:2
+    'Methyl linolenate'     # C18:3
 ]
 
 FEATURE_MAPPING = {
@@ -123,6 +124,7 @@ FEATURE_MAPPING = {
     'Methyl laurate': 'Lauric (C12:0)',
     'Methyl myristate': 'Myristic (C14:0)',
     'Methyl palmitate': 'Palmitic (C16:0)',
+    'Methyl palmitoleate': 'Palmitoleate (C16:1)',
     'Methyl stearate': 'Stearic (C18:0)',
     'Methyl oleate': 'Oleic (C18:1)',
     'Methyl linoleate': 'Linoleic (C18:2)',
@@ -132,6 +134,63 @@ FEATURE_MAPPING = {
 # -----------------------------------------------------------------------------
 # 3. 실제 원본 데이터 기반 모델 학습 엔진 (추출물 및 코코넛오일 전용)
 # -----------------------------------------------------------------------------
+def train_synthetic_fallback():
+    """
+    엑셀 파일 부재 시 시스템 가동을 유지하기 위한 최소한의 합성 데이터 폴백 학습기입니다.
+    """
+    np.random.seed(42)
+    n_samples = 30
+    pure_saw = []
+    for _ in range(n_samples):
+        c12 = np.random.uniform(20.0, 28.0)
+        c18_1 = np.random.uniform(22.0, 32.0)
+        c14 = c12 / np.random.uniform(2.3, 2.7)
+        c16 = c12 / np.random.uniform(2.9, 3.8)
+        c16_1 = np.random.uniform(0.1, 0.4)           # C16:1 추가
+        c18_0 = c12 / np.random.uniform(14.5, 24.0)
+        c18_2 = c12 / np.random.uniform(6.0, 14.0)
+        c18_3 = c12 / np.random.uniform(32.0, 50.0)
+        c6 = c12 / np.random.uniform(9.0, 22.0)
+        c8 = c12 / np.random.uniform(9.0, 16.0)
+        c10 = c12 / np.random.uniform(9.5, 15.0)
+        row = [c6, c8, c10, c12, c14, c16, c16_1, c18_0, c18_1, c18_2, c18_3]
+        row = np.array(row)
+        row = (row / row.sum()) * 100.0
+        pure_saw.append(row)
+        
+    df_pure = pd.DataFrame(pure_saw, columns=FEATURE_COLS)
+    df_pure['Target'] = 0
+    
+    adulterated = []
+    for _ in range(n_samples):
+        c12 = np.random.uniform(35.0, 48.0)
+        c14 = np.random.uniform(14.0, 20.0)
+        c18_1 = np.random.uniform(3.0, 6.0)
+        c18_2 = np.random.uniform(0.5, 2.0)
+        c16 = np.random.uniform(6.0, 9.5)
+        c16_1 = np.random.uniform(0.0, 0.1)           # C16:1 추가
+        c18_0 = np.random.uniform(15.0, 25.0)
+        c6 = np.random.uniform(0.2, 0.8)
+        c8 = np.random.uniform(3.0, 6.0)
+        c10 = np.random.uniform(3.0, 7.0)
+        c18_3 = np.random.uniform(0.0, 0.5)
+        row = [c6, c8, c10, c12, c14, c16, c16_1, c18_0, c18_1, c18_2, c18_3]
+        row = np.array(row)
+        row = (row / row.sum()) * 100.0
+        adulterated.append(row)
+        
+    df_adulter = pd.DataFrame(adulterated, columns=FEATURE_COLS)
+    df_adulter['Target'] = 1
+    
+    df_total = pd.concat([df_pure, df_adulter], axis=0).reset_index(drop=True)
+    X = df_total[FEATURE_COLS]
+    y = df_total['Target']
+    
+    model = CatBoostClassifier(iterations=60, learning_rate=0.08, depth=3, verbose=0, random_seed=42)
+    model.fit(X, y)
+    explainer = shap.TreeExplainer(model)
+    return model, explainer, X
+
 @st.cache_resource
 def train_standard_model():
     """
