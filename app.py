@@ -355,70 +355,32 @@ if 'df_norm' in locals():
         prob_fake = probs[idx][1] * 100.0
         
         lauric = row['Methyl laurate']
-        violations = []
-        detailed_status = []
         
-        # USP 검증 엔진
-        usp_standards = {
-            'C6:0': ('Methyl caproate', 8.5, 24.0),
-            'C8:0': ('Methyl caprylate', 8.5, 17.5),
-            'C10:0': ('Methyl caprate', 9.0, 16.0),
-            'C14:0': ('Methyl myristate', 2.2, 2.8),
-            'C16:0': ('Methyl palmitate', 2.8, 3.9),
-            'C18:0': ('Methyl stearate', 14.0, 26.0),
-            'C18:1': ('Methyl oleate', 0.60, 1.15),
-            'C18:2': ('Methyl linoleate', 5.0, 16.0),
-            'C18:3': ('Methyl linolenate', 31.5, 55.0)
-        }
-        
-        for k, (orig_name, low, high) in usp_standards.items():
-            val = row[orig_name]
-            ratio = lauric / val if val > 0 else np.inf
-            if ratio < low or ratio > high:
-                violations.append(f"{k} ({ratio:.2f})")
-                detailed_status.append({
-                    "지방산 종류": k,
-                    "FAMEs 원시 함량": f"{val:.3f}%",
-                    "C12 대비 비율": f"{ratio:.2f}",
-                    "USP 규격 기준": f"{low} ~ {high}",
-                    "판정": "❌ 불합격"
-                })
-            else:
-                detailed_status.append({
-                    "지방산 종류": k,
-                    "FAMEs 원시 함량": f"{val:.3f}%",
-                    "C12 대비 비율": f"{ratio:.2f}",
-                    "USP 규격 기준": f"{low} ~ {high}",
-                    "판정": "✅ 합격"
-                })
-                
-        num_violate = len(violations)
-        
-        # Expander 제목 정의 (한눈에 결과를 볼 수 있게 컬러코드화)
+        # Expander 제목 정의 (오직 머신러닝 판정에만 100% 기반하여 정품🟢 / 가짜🔴 분류)
         if pred_label == 0:
-            if num_violate > 0:
-                title = f"🟡 [혼입의심/경고] {sample_name} | 정품 확률 {prob_pure:.1f}% | USP 미세이탈 {num_violate}건"
-            else:
-                title = f"🟢 [정품판정/통과] {sample_name} | 정품 확률 {prob_pure:.1f}% | USP 규격 완벽통합"
+            title = f"🟢 [정품판정/통과] {sample_name} | 정품 신뢰도 {prob_pure:.1f}%"
         else:
-            title = f"🔴 [가짜/혼입판정] {sample_name} | 혼입 위험도 {prob_fake:.1f}% | USP 불합격 {num_violate}건"
+            title = f"🔴 [가짜/혼입판정] {sample_name} | 혼입 위험도 {prob_fake:.1f}%"
             
         with st.expander(title, expanded=False):
             # 레이아웃을 좌우로 나누어 상세 분석표와 지방산 프로파일 차트 렌더링
-            col_d1, col_d2 = st.columns([1.3, 1])
+            col_d1, col_d2 = st.columns([1.1, 1])
             
             with col_d1:
-                st.markdown("**🔬 USP 기준 대조 분석표 (C12:0 분자 비율 기준)**")
-                df_det = pd.DataFrame(detailed_status)
+                st.markdown("**🔬 정규화된 10대 주요 지방산 조성 분석표**")
                 
-                # 가독성을 위해 판정 컬럼 색상 하이라이팅
-                def style_cell_by_result(val):
-                    color = '#fef2f2' if '❌' in val else '#f0fdf4'
-                    text_color = '#b91c1c' if '❌' in val else '#15803d'
-                    return f'background-color: {color}; color: {text_color}; font-weight: bold;'
-                    
+                # 해당 샘플의 실제 FAMEs 원시 함량을 표로 정리
+                composition_data = []
+                for col in FEATURE_COLS:
+                    val = row[col]
+                    composition_data.append({
+                        "지방산 종류": FEATURE_MAPPING[col],
+                        "정규화 농도 (Area %)": f"{val:.3f}%"
+                    })
+                df_comp = pd.DataFrame(composition_data)
+                
                 st.dataframe(
-                    df_det.style.map(style_cell_by_result, subset=['판정']),
+                    df_comp,
                     use_container_width=True, 
                     hide_index=True
                 )
